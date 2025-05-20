@@ -6,7 +6,10 @@ const maxSearches = 5;
 // Function to show the modal
 function showModal() {
   var modal = document.getElementById("productModal");
-  modal.style.display = "block";
+  modal.style.display = "flex";
+  // Force reflow to enable animation
+  modal.offsetHeight;
+  modal.classList.add("show");
   document.body.style.overflow = "hidden";
 
   // Close when clicking outside
@@ -33,8 +36,13 @@ function showModal() {
 // Function to close the modal
 function closeModal() {
   var modal = document.getElementById("productModal");
-  modal.style.display = "none";
-  document.body.style.overflow = "";
+  modal.classList.remove("show");
+
+  // Wait for animation to complete before hiding
+  setTimeout(function () {
+    modal.style.display = "none";
+    document.body.style.overflow = "";
+  }, 300); // Match this with CSS transition duration
 }
 
 // Function to copy barcode
