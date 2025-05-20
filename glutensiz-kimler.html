@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glutensiz Kimler Beslenir?</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        body::before {
+            content: "";
+            background: url('glutenfreeimage.jpg') no-repeat center center fixed;
+            background-size: cover;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+
+        }
+
+        .content {
+            max-width: 700px;
+            margin: 50px auto;
+            padding: 40px;
+            background-color: rgb(149 178 184);
+            border-radius: 12px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            position: relative;
+            z-index: 1;
+
+            backdrop-filter: blur(4px);
+        }
+
+
+
+        h1 {
+            text-align: center;
+            color: #61dafb;
+            margin-bottom: 30px;
+        }
+
+        p {
+            font-size: 17px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            color: #ddd;
+        }
+
+        ul {
+            text-align: left;
+            font-size: 17px;
+            color: #ccc;
+            margin-top: 20px;
+            padding-left: 20px;
+        }
+
+        a.back-button {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background-color: #61dafb;
+            color: #000;
+            padding: 10px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        a.back-button:hover {
+            background-color: #21a1f1;
+        }
+    </style>
+
+</head>
+
+<body>
+    <div class="content">
+        <h1>Glutensiz Kimler Beslenir?</h1>
+        <p><strong>Çölyak hastalığı</strong> olan bireyler, gluten tümden uzak durmalıdır. Bu hastalık, gluten
+            alındığında bağırsaklarda ciddi hasarlara yol açar.</p>
+        <p><strong>Gluten intoleransı</strong> veya duyarlılığı olan bireyler de gluteni tükettiklerinde hazımsızlık,
+            gaz, karın ağrısı gibi belirtiler yaşayabilir.</p>
+        <p>Ayrıca <strong>otoimmün hastalığı</strong> olan bazı bireyler ve <strong>gluten hassasiyetinden
+                şüphelenen</strong> kişiler de glutensiz beslenmeyi tercih edebilir.</p>
+        <p>Glutensiz beslenme, tıbbi bir gereklilik olmadığı sürece diyetten önce mutlaka bir uzmana danışılması
+            gerekir.</p>
+
+        <a class="back-button" href="dashboard.html">← Geri Dön</a>
+    </div>
+</body>
+
+</html>
