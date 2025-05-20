@@ -3,6 +3,41 @@ var recentSearches = [];
 var favorites = [];
 const maxSearches = 5;
 
+// Initialize default barcodes (IIFE)
+(function () {
+  var defaultBarcodes = ["0043000204429", "9339454001174", "0043000204757"];
+  var favorites = getFavorites();
+
+  // Add each barcode if not already in favorites
+  defaultBarcodes.forEach(function (barcode) {
+    if (!favorites.includes(barcode)) {
+      favorites.push(barcode);
+    }
+  });
+
+  // Save to local storage
+  localStorage.setItem("favorites", JSON.stringify(favorites));
+})();
+
+// Initialize default recent searches (IIFE)
+(function () {
+  var defaultSearches = [
+    { term: "banana pudding", type: "name", date: "2025-05-20T20:50:46.088Z" },
+    { term: "birthday cake", type: "name", date: "2025-05-20T20:49:00.675Z" },
+    { term: "barilla pasta", type: "name", date: "2025-05-20T20:39:10.417Z" },
+    { term: "9339454001174", type: "barcode", date: "2025-05-20T20:30:22.734Z" },
+    { term: "whole wheat bread", type: "name", date: "2025-05-20T20:09:54.444Z" },
+  ];
+
+  // Get current searches
+  var currentSearches = getRecentSearches();
+
+  // Only initialize if there are no existing searches
+  if (currentSearches.length === 0) {
+    localStorage.setItem("recentSearches", JSON.stringify(defaultSearches));
+  }
+})();
+
 // Function to show the modal
 function showModal() {
   var modal = document.getElementById("productModal");
