@@ -1,10 +1,123 @@
+// Constants
+const MAX_RECENT_SEARCHES = 5;
+const FAVORITES_KEY = "favorites";
+
 // API Configuration
 const API_BASE_URL = "https://world.openfoodfacts.org";
 const RATE_LIMIT_DELAY = 1000; // 1 second delay between requests
-const MAX_RECENT_SEARCHES = 5;
 
 // Add delay between requests
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Modal functions
+function showModal() {
+  const modal = document.getElementById("productModal");
+  document.body.style.overflow = "hidden";
+  modal.classList.add("show");
+
+  // Close modal when clicking outside
+  modal.onclick = (e) => {
+    if (e.target === modal) closeModal();
+  };
+
+  // Close modal when clicking close button
+  const closeBtn = modal.querySelector(".close-modal");
+  closeBtn.onclick = closeModal;
+
+  // Close modal on Escape key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeModal();
+  });
+}
+
+function closeModal() {
+  const modal = document.getElementById("productModal");
+  document.body.style.overflow = "";
+  modal.classList.remove("show");
+}
+
+// Add copy functionality
+async function copyToClipboard(text, button) {
+  try {
+    await navigator.clipboard.writeText(text);
+    button.classList.add("copied");
+    button.innerHTML = "✓";
+
+    // Reset button after 2 seconds
+    setTimeout(() => {
+      button.classList.remove("copied");
+      button.innerHTML = "📋";
+    }, 2000);
+  } catch (err) {
+    console.error("Failed to copy text: ", err);
+  }
+}
+
+// Create copy button element
+function createCopyButton(barcode) {
+  const button = document.createElement("button");
+  button.className = "copy-button";
+  button.innerHTML = "📋";
+  button.onclick = (e) => {
+    e.stopPropagation(); // Prevent modal from opening when clicking copy button
+    copyToClipboard(barcode, button);
+  };
+  return button;
+}
+
+function displayInModal(product) {
+  // Set modal content
+  document.getElementById("modalProductName").textContent = product.product_name || "Unnamed Product";
+  document.getElementById("modalBrand").textContent = product.brands || "Not specified";
+  document.getElementById("modalCategory").textContent = product.categories || "Not specified";
+
+  // Update barcode display with copy button
+  const barcodeContainer = document.getElementById("modalBarcode");
+  const barcode = product.code || "No barcode available";
+  barcodeContainer.innerHTML = "";
+  barcodeContainer.className = "barcode-container";
+
+  const barcodeText = document.createElement("span");
+  barcodeText.textContent = barcode;
+  barcodeContainer.appendChild(barcodeText);
+
+  if (barcode !== "No barcode available") {
+    barcodeContainer.appendChild(createCopyButton(barcode));
+  }
+
+  // Set gluten status with appropriate styling
+  const glutenStatusElement = document.getElementById("modalGlutenStatus");
+  if (isGlutenFree(product)) {
+    glutenStatusElement.innerHTML = '<span class="gluten-free-status status-safe">✓ Gluten Free</span>';
+  } else if (!product.allergens_tags && !product.labels_tags) {
+    glutenStatusElement.innerHTML = '<span class="gluten-free-status status-unknown">? Status Unknown</span>';
+  } else {
+    glutenStatusElement.innerHTML = '<span class="gluten-free-status status-unsafe">⚠ Contains Gluten</span>';
+  }
+
+  // Set allergens
+  const allergens = (product.allergens_tags || [])
+    .map((allergen) =>
+      allergen
+        .replace("en:", "")
+        .replace(/-/g, " ")
+        .replace(/\b\w/g, (l) => l.toUpperCase())
+    )
+    .join(", ");
+  document.getElementById("modalAllergens").textContent = allergens || "None specified";
+
+  // Set product image
+  const modalImageContainer = document.getElementById("modalProductImage").parentElement;
+  const imageUrl = product.image_url || product.selected_images?.front?.display?.url || "";
+
+  if (imageUrl) {
+    modalImageContainer.innerHTML = `<img id="modalProductImage" src="${imageUrl}" alt="${product.product_name || "Product"}" onerror="this.parentElement.innerHTML='<div class=\'no-image-placeholder\'>No image available</div>'">`;
+  } else {
+    modalImageContainer.innerHTML = '<div class="no-image-placeholder">No image available</div>';
+  }
+
+  showModal();
+}
 
 // Loading state management
 function setLoading(isLoading) {
@@ -23,6 +136,17 @@ function setLoading(isLoading) {
   }
 }
 
+// Error handling
+function showError(message) {
+  const searchResults = document.getElementById("searchResults");
+  searchResults.innerHTML = `
+    <div style="color: #dc3545; text-align: center; padding: 20px;">
+      <p>😕 ${message}</p>
+      <p style="font-size: 0.9em; color: #666;">Please try again later.</p>
+    </div>
+  `;
+}
+
 // Recent searches management
 function getRecentSearches() {
   const searches = localStorage.getItem("recentSearches");
@@ -31,16 +155,9 @@ function getRecentSearches() {
 
 function addRecentSearch(searchTerm, searchType) {
   let searches = getRecentSearches();
-
-  // Remove if already exists
   searches = searches.filter((search) => !(search.term === searchTerm && search.type === searchType));
-
-  // Add new search at the beginning
   searches.unshift({ term: searchTerm, type: searchType, timestamp: new Date().toISOString() });
-
-  // Keep only the most recent searches
   searches = searches.slice(0, MAX_RECENT_SEARCHES);
-
   localStorage.setItem("recentSearches", JSON.stringify(searches));
   displayRecentSearches();
 }
@@ -65,10 +182,10 @@ function displayRecentSearches() {
   searches.forEach((search, index) => {
     const searchItem = document.createElement("div");
     searchItem.className = "recent-search-item";
+    searchItem.onclick = (e) => {
+      // Don't trigger search if clicking the remove button
+      if (e.target.classList.contains("remove-search")) return;
 
-    const searchContent = document.createElement("div");
-    searchContent.textContent = search.term;
-    searchContent.onclick = () => {
       document.getElementById("searchInput").value = search.term;
       if (search.type === "barcode") {
         searchByBarcode();
@@ -77,35 +194,64 @@ function displayRecentSearches() {
       }
     };
 
-    const searchType = document.createElement("span");
-    searchType.className = "search-type";
-    searchType.textContent = search.type === "barcode" ? "Barcode" : "Name";
+    searchItem.innerHTML = `
+      <div class="search-content">
+        <span class="search-term">${search.term}</span>
+        <span class="search-type">${search.type === "barcode" ? "Barcode" : "Name"}</span>
+      </div>
+      <span class="remove-search" onclick="removeRecentSearch(${index})">×</span>
+    `;
 
-    const removeButton = document.createElement("span");
-    removeButton.className = "remove-search";
-    removeButton.textContent = "×";
-    removeButton.onclick = (e) => {
-      e.stopPropagation();
-      removeRecentSearch(index);
-    };
-
-    searchItem.appendChild(searchContent);
-    searchItem.appendChild(searchType);
-    searchItem.appendChild(removeButton);
     container.appendChild(searchItem);
   });
 }
 
 // Check if product is gluten-free
 function isGlutenFree(product) {
-  // Check for gluten-free labels
   const labels = product.labels_tags || [];
   if (labels.includes("en:gluten-free")) return true;
 
-  // Check allergens
   const allergens = product.allergens_tags || [];
   const glutenAllergens = ["en:gluten", "en:wheat", "en:barley", "en:rye", "en:oats"];
   return !allergens.some((allergen) => glutenAllergens.includes(allergen));
+}
+
+// Helper function for API calls
+async function fetchAPI(url, options = {}) {
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "GlutenCheck - Android - Version 1.0 - www.glutencheck.com",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error("Fetch error:", error);
+    throw error;
+  }
+}
+
+// Helper function to check if product is in English
+function isEnglishProduct(product) {
+  // Check if product name exists and is in English
+  if (!product.product_name) return false;
+
+  // Check for specific English indicators
+  const hasEnglishName = product.product_name_en || product.product_name.match(/^[a-zA-Z0-9\s\W]+$/);
+
+  // If product has languages_tags, check if English is included
+  if (product.languages_tags) {
+    return product.languages_tags.includes("en");
+  }
+
+  return hasEnglishName;
 }
 
 // Search by barcode
@@ -118,40 +264,25 @@ async function searchByBarcode() {
 
   // Clear previous results
   document.getElementById("searchResults").innerHTML = "";
-  document.getElementById("productInfo").style.display = "none";
+  const oldProductInfo = document.getElementById("productInfo");
+  if (oldProductInfo) oldProductInfo.remove();
 
   // Show loading state
   setLoading(true);
 
   try {
-    // Using the product API for exact barcode matches
-    const response = await fetch(`${API_BASE_URL}/api/v0/product/${searchValue}.json`, {
-      headers: {
-        "User-Agent": "OpenFoodFacts/1.0",
-      },
-    });
-
-    if (response.status === 429) {
-      alert("Rate limit exceeded. Please wait a moment before trying again.");
-      return;
-    }
-
-    const data = await response.json();
+    const data = await API.searchByBarcode(searchValue);
 
     if (data.status === 1) {
       addRecentSearch(searchValue, "barcode");
-      displayProduct(data.product);
+      displayInModal(data.product);
     } else {
-      alert("Product not found");
+      showError("Product not found");
     }
-
-    // Add delay after successful request
-    await delay(RATE_LIMIT_DELAY);
   } catch (error) {
     console.error("Error:", error);
-    alert("An error occurred. Please try again later.");
+    showError("Failed to fetch product information");
   } finally {
-    // Hide loading state
     setLoading(false);
   }
 }
@@ -166,42 +297,103 @@ async function searchByName() {
 
   // Clear previous results
   document.getElementById("searchResults").innerHTML = "";
-  document.getElementById("productInfo").style.display = "none";
+  const oldProductInfo = document.getElementById("productInfo");
+  if (oldProductInfo) oldProductInfo.remove();
 
   // Show loading state
   setLoading(true);
 
   try {
-    // Using the optimized search API with specific fields and sorting
-    const response = await fetch(`${API_BASE_URL}/cgi/search.pl?search_terms=${encodeURIComponent(searchValue)}&search_simple=1&action=process&json=1&page_size=15&sort_by=popularity_key&fields=product_name,brands,categories,allergens_tags,labels_tags,image_url,selected_images`, {
-      headers: {
-        "User-Agent": "OpenFoodFacts/1.0",
-      },
-    });
-
-    if (response.status === 429) {
-      alert("Rate limit exceeded. Please wait a moment before trying again.");
-      return;
-    }
-
-    const data = await response.json();
+    const data = await API.searchByName(searchValue);
 
     if (data.products && data.products.length > 0) {
       addRecentSearch(searchValue, "name");
       displaySearchResults(data.products);
     } else {
-      document.getElementById("searchResults").innerHTML = "<p>No products found</p>";
+      showError("No products found");
     }
-
-    // Add delay after successful request
-    await delay(RATE_LIMIT_DELAY);
   } catch (error) {
     console.error("Error:", error);
-    alert("An error occurred. Please try again later.");
+    showError("Failed to fetch search results");
   } finally {
-    // Hide loading state
     setLoading(false);
   }
+}
+
+// Add this function to manage favorites
+function getFavorites() {
+  const favorites = localStorage.getItem(FAVORITES_KEY);
+  return favorites ? JSON.parse(favorites) : [];
+}
+
+function toggleFavorite(code) {
+  let favorites = getFavorites();
+  const index = favorites.indexOf(code);
+
+  if (index === -1) {
+    favorites.push(code);
+  } else {
+    favorites.splice(index, 1);
+  }
+
+  localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+
+  // If we're viewing favorites, refresh the display
+  const favButton = document.getElementById("favoritesButton");
+  if (favButton.classList.contains("active")) {
+    showFavorites();
+  }
+
+  return index === -1;
+}
+
+// Show favorites
+async function showFavorites() {
+  const favorites = getFavorites();
+  if (favorites.length === 0) {
+    showError("No favorite products yet! Click the ♥ on products to add them to favorites.");
+    return;
+  }
+
+  // Clear previous results
+  document.getElementById("searchResults").innerHTML = "";
+  const oldProductInfo = document.getElementById("productInfo");
+  if (oldProductInfo) oldProductInfo.remove();
+
+  // Show loading state
+  setLoading(true);
+
+  try {
+    const products = [];
+    // Fetch details for each favorite product
+    for (const code of favorites) {
+      try {
+        const data = await API.getById(code);
+        if (data.status === 1) {
+          products.push(data.product);
+        }
+      } catch (error) {
+        console.error(`Error fetching product ${code}:`, error);
+      }
+    }
+
+    if (products.length > 0) {
+      displaySearchResults(products);
+    } else {
+      showError("Failed to load favorite products. Please try again later.");
+    }
+  } catch (error) {
+    console.error("Error:", error);
+    showError("Failed to load favorite products");
+  } finally {
+    setLoading(false);
+  }
+}
+
+// Helper function to check if a product is in favorites
+function isInFavorites(code) {
+  const favorites = getFavorites();
+  return favorites.includes(code);
 }
 
 // Display search results
@@ -213,60 +405,36 @@ function displaySearchResults(products) {
     const resultItem = document.createElement("div");
     resultItem.className = "result-item";
 
-    // Add gluten-free class if product is gluten-free
     if (isGlutenFree(product)) {
       resultItem.classList.add("gluten-free");
+    } else if (!product.allergens_tags && !product.labels_tags) {
+      resultItem.classList.add("gluten-unknown");
     }
 
     const productName = product.product_name || "Unnamed Product";
     const imageUrl = product.image_url || product.selected_images?.front?.display?.url || "";
+    const barcode = product.code || "No barcode available";
+    const isFavorite = isInFavorites(barcode);
+
+    const imageHtml = imageUrl ? `<img src="${imageUrl}" alt="${productName}" onerror="this.parentElement.innerHTML='<div class=\'no-image-placeholder\'>No image available</div>'">` : `<div class="no-image-placeholder">No image available</div>`;
 
     resultItem.innerHTML = `
-            <img src="${imageUrl}" alt="${productName}" onerror="this.style.display='none'">
-            <span>${productName}</span>
-        `;
+      ${imageHtml}
+      <button class="fav-button ${isFavorite ? "active" : ""}" onclick="event.stopPropagation(); this.classList.toggle('active'); toggleFavorite('${barcode}');">
+        ♥
+      </button>
+      <div class="product-info">
+        <span class="product-name">${productName}</span>
+        <span class="barcode">
+          ${barcode}
+          ${barcode !== "No barcode available" ? `<button class="copy-button" onclick="event.stopPropagation(); copyToClipboard('${barcode}', this)">📋</button>` : ""}
+        </span>
+      </div>
+    `;
 
-    resultItem.onclick = () => displayProduct(product);
+    resultItem.onclick = () => displayInModal(product);
     resultsContainer.appendChild(resultItem);
   });
-}
-
-// Display product details
-function displayProduct(product) {
-  const productInfo = document.getElementById("productInfo");
-  productInfo.style.display = "block";
-
-  document.getElementById("productName").textContent = product.product_name || "Unnamed Product";
-  document.getElementById("brand").textContent = product.brands || "Not specified";
-  document.getElementById("category").textContent = product.categories || "Not specified";
-
-  // Display allergens
-  const allergens = product.allergens_tags || [];
-  const allergensText =
-    allergens.length > 0
-      ? allergens
-          .map((allergen) => {
-            return allergen
-              .replace("en:", "")
-              .replace(/-/g, " ")
-              .replace(/\b\w/g, (l) => l.toUpperCase());
-          })
-          .join(", ")
-      : "Not specified";
-  document.getElementById("allergens").textContent = allergensText;
-
-  // Product image
-  const imageUrl = product.image_url || product.selected_images?.front?.display?.url;
-  const productImage = document.getElementById("productImage");
-  if (imageUrl) {
-    productImage.src = imageUrl;
-    productImage.style.display = "block";
-  } else {
-    productImage.style.display = "none";
-  }
-
-  // Scroll to product info
-  productInfo.scrollIntoView({ behavior: "smooth" });
 }
 
 // Initialize recent searches display
