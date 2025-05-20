@@ -1,441 +1,454 @@
-// Constants
-const MAX_RECENT_SEARCHES = 5;
-const FAVORITES_KEY = "favorites";
+// Variables for the website
+var recentSearches = [];
+var favorites = [];
+const maxSearches = 5;
 
-// API Configuration
-const API_BASE_URL = "https://world.openfoodfacts.org";
-const RATE_LIMIT_DELAY = 1000; // 1 second delay between requests
-
-// Add delay between requests
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// Modal functions
+// Function to show the modal
 function showModal() {
-  const modal = document.getElementById("productModal");
+  var modal = document.getElementById("productModal");
+  modal.style.display = "block";
   document.body.style.overflow = "hidden";
-  modal.classList.add("show");
 
-  // Close modal when clicking outside
-  modal.onclick = (e) => {
-    if (e.target === modal) closeModal();
+  // Close when clicking outside
+  modal.onclick = function (e) {
+    if (e.target == modal) {
+      closeModal();
+    }
   };
 
-  // Close modal when clicking close button
-  const closeBtn = modal.querySelector(".close-modal");
-  closeBtn.onclick = closeModal;
+  // Close with X button
+  var closeBtn = modal.querySelector(".close-modal");
+  closeBtn.onclick = function () {
+    closeModal();
+  };
 
-  // Close modal on Escape key
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeModal();
-  });
+  // Close with ESC key
+  document.onkeydown = function (e) {
+    if (e.key == "Escape") {
+      closeModal();
+    }
+  };
 }
 
+// Function to close the modal
 function closeModal() {
-  const modal = document.getElementById("productModal");
+  var modal = document.getElementById("productModal");
+  modal.style.display = "none";
   document.body.style.overflow = "";
-  modal.classList.remove("show");
 }
 
-// Add copy functionality
-async function copyToClipboard(text, button) {
-  try {
-    await navigator.clipboard.writeText(text);
-    button.classList.add("copied");
-    button.innerHTML = "✓";
+// Function to copy barcode
+function copyBarcode(text, button) {
+  navigator.clipboard
+    .writeText(text)
+    .then(function () {
+      button.innerHTML = "✓";
+      button.style.backgroundColor = "#4CAF50";
 
-    // Reset button after 2 seconds
-    setTimeout(() => {
-      button.classList.remove("copied");
-      button.innerHTML = "📋";
-    }, 2000);
-  } catch (err) {
-    console.error("Failed to copy text: ", err);
-  }
+      // Change back after 2 seconds
+      setTimeout(function () {
+        button.innerHTML = "📋";
+        button.style.backgroundColor = "";
+      }, 2000);
+    })
+    .catch(function (err) {
+      console.log("Could not copy text: ", err);
+    });
 }
 
-// Create copy button element
-function createCopyButton(barcode) {
-  const button = document.createElement("button");
-  button.className = "copy-button";
-  button.innerHTML = "📋";
-  button.onclick = (e) => {
-    e.stopPropagation(); // Prevent modal from opening when clicking copy button
-    copyToClipboard(barcode, button);
+// Function to make copy button
+function makeCopyButton(barcode) {
+  var btn = document.createElement("button");
+  btn.innerHTML = "📋";
+  btn.onclick = function (e) {
+    e.stopPropagation();
+    copyBarcode(barcode, btn);
   };
-  return button;
+  return btn;
 }
 
-function displayInModal(product) {
-  // Set modal content
-  document.getElementById("modalProductName").textContent = product.product_name || "Unnamed Product";
-  document.getElementById("modalBrand").textContent = product.brands || "Not specified";
-  document.getElementById("modalCategory").textContent = product.categories || "Not specified";
+// Function to show loading
+function showLoading(show) {
+  var spinner = document.getElementById("loadingSpinner");
+  var barcodeBtn = document.getElementById("barcodeButton");
+  var nameBtn = document.getElementById("nameButton");
 
-  // Update barcode display with copy button
-  const barcodeContainer = document.getElementById("modalBarcode");
-  const barcode = product.code || "No barcode available";
-  barcodeContainer.innerHTML = "";
-  barcodeContainer.className = "barcode-container";
-
-  const barcodeText = document.createElement("span");
-  barcodeText.textContent = barcode;
-  barcodeContainer.appendChild(barcodeText);
-
-  if (barcode !== "No barcode available") {
-    barcodeContainer.appendChild(createCopyButton(barcode));
-  }
-
-  // Set gluten status with appropriate styling
-  const glutenStatusElement = document.getElementById("modalGlutenStatus");
-  if (isGlutenFree(product)) {
-    glutenStatusElement.innerHTML = '<span class="gluten-free-status status-safe">✓ Gluten Free</span>';
-  } else if (!product.allergens_tags && !product.labels_tags) {
-    glutenStatusElement.innerHTML = '<span class="gluten-free-status status-unknown">? Status Unknown</span>';
-  } else {
-    glutenStatusElement.innerHTML = '<span class="gluten-free-status status-unsafe">⚠ Contains Gluten</span>';
-  }
-
-  // Set allergens
-  const allergens = (product.allergens_tags || [])
-    .map((allergen) =>
-      allergen
-        .replace("en:", "")
-        .replace(/-/g, " ")
-        .replace(/\b\w/g, (l) => l.toUpperCase())
-    )
-    .join(", ");
-  document.getElementById("modalAllergens").textContent = allergens || "None specified";
-
-  // Set product image
-  const modalImageContainer = document.getElementById("modalProductImage").parentElement;
-  const imageUrl = product.image_url || product.selected_images?.front?.display?.url || "";
-
-  if (imageUrl) {
-    modalImageContainer.innerHTML = `<img id="modalProductImage" src="${imageUrl}" alt="${product.product_name || "Product"}" onerror="this.parentElement.innerHTML='<div class=\'no-image-placeholder\'>No image available</div>'">`;
-  } else {
-    modalImageContainer.innerHTML = '<div class="no-image-placeholder">No image available</div>';
-  }
-
-  showModal();
-}
-
-// Loading state management
-function setLoading(isLoading) {
-  const spinner = document.getElementById("loadingSpinner");
-  const barcodeButton = document.getElementById("barcodeButton");
-  const nameButton = document.getElementById("nameButton");
-
-  if (isLoading) {
+  if (show) {
     spinner.style.display = "block";
-    barcodeButton.disabled = true;
-    nameButton.disabled = true;
+    barcodeBtn.disabled = true;
+    nameBtn.disabled = true;
   } else {
     spinner.style.display = "none";
-    barcodeButton.disabled = false;
-    nameButton.disabled = false;
+    barcodeBtn.disabled = false;
+    nameBtn.disabled = false;
   }
 }
 
-// Error handling
+// Function to show error
 function showError(message) {
-  const searchResults = document.getElementById("searchResults");
-  searchResults.innerHTML = `
-    <div style="color: #dc3545; text-align: center; padding: 20px;">
-      <p>😕 ${message}</p>
-      <p style="font-size: 0.9em; color: #666;">Please try again later.</p>
-    </div>
-  `;
+  var results = document.getElementById("searchResults");
+  results.innerHTML = '<div style="color: red; text-align: center; padding: 20px;">' + "<p>😕 " + message + "</p>" + '<p style="font-size: 14px; color: #666;">Try again later</p>' + "</div>";
 }
 
-// Recent searches management
+// Function to get recent searches
 function getRecentSearches() {
-  const searches = localStorage.getItem("recentSearches");
+  var searches = localStorage.getItem("recentSearches");
   return searches ? JSON.parse(searches) : [];
 }
 
-function addRecentSearch(searchTerm, searchType) {
-  let searches = getRecentSearches();
-  searches = searches.filter((search) => !(search.term === searchTerm && search.type === searchType));
-  searches.unshift({ term: searchTerm, type: searchType, timestamp: new Date().toISOString() });
-  searches = searches.slice(0, MAX_RECENT_SEARCHES);
+// Function to add recent search
+function addRecentSearch(term, type) {
+  var searches = getRecentSearches();
+
+  // Remove if already exists
+  for (var i = 0; i < searches.length; i++) {
+    if (searches[i].term == term && searches[i].type == type) {
+      searches.splice(i, 1);
+      break;
+    }
+  }
+
+  // Add to start
+  searches.unshift({
+    term: term,
+    type: type,
+    date: new Date().toISOString(),
+  });
+
+  // Keep only 5 searches
+  if (searches.length > maxSearches) {
+    searches = searches.slice(0, maxSearches);
+  }
+
   localStorage.setItem("recentSearches", JSON.stringify(searches));
-  displayRecentSearches();
+  showRecentSearches();
 }
 
+// Function to remove recent search
 function removeRecentSearch(index) {
-  let searches = getRecentSearches();
+  var searches = getRecentSearches();
   searches.splice(index, 1);
   localStorage.setItem("recentSearches", JSON.stringify(searches));
-  displayRecentSearches();
+  showRecentSearches();
 }
 
-function displayRecentSearches() {
-  const searches = getRecentSearches();
-  const container = document.getElementById("recentSearchesList");
+// Function to show recent searches
+function showRecentSearches() {
+  var searches = getRecentSearches();
+  var container = document.getElementById("recentSearchesList");
   container.innerHTML = "";
 
-  if (searches.length === 0) {
+  if (searches.length == 0) {
     container.innerHTML = "<p>No recent searches</p>";
     return;
   }
 
-  searches.forEach((search, index) => {
-    const searchItem = document.createElement("div");
-    searchItem.className = "recent-search-item";
-    searchItem.onclick = (e) => {
-      // Don't trigger search if clicking the remove button
-      if (e.target.classList.contains("remove-search")) return;
+  for (var i = 0; i < searches.length; i++) {
+    var search = searches[i];
+    var div = document.createElement("div");
+    div.className = "recent-search-item";
 
-      document.getElementById("searchInput").value = search.term;
-      if (search.type === "barcode") {
-        searchByBarcode();
-      } else {
-        searchByName();
-      }
-    };
+    div.onclick = (function (search) {
+      return function (e) {
+        if (e.target.className == "remove-search") return;
 
-    searchItem.innerHTML = `
-      <div class="search-content">
-        <span class="search-term">${search.term}</span>
-        <span class="search-type">${search.type === "barcode" ? "Barcode" : "Name"}</span>
-      </div>
-      <span class="remove-search" onclick="removeRecentSearch(${index})">×</span>
-    `;
+        document.getElementById("searchInput").value = search.term;
+        if (search.type == "barcode") {
+          searchByBarcode();
+        } else {
+          searchByName();
+        }
+      };
+    })(search);
 
-    container.appendChild(searchItem);
-  });
-}
+    div.innerHTML = '<div class="search-content">' + "<span>" + search.term + "</span>" + "<span>" + (search.type == "barcode" ? "Barcode" : "Name") + "</span>" + "</div>" + '<span class="remove-search" onclick="removeRecentSearch(' + i + ')">×</span>';
 
-// Check if product is gluten-free
-function isGlutenFree(product) {
-  const labels = product.labels_tags || [];
-  if (labels.includes("en:gluten-free")) return true;
-
-  const allergens = product.allergens_tags || [];
-  const glutenAllergens = ["en:gluten", "en:wheat", "en:barley", "en:rye", "en:oats"];
-  return !allergens.some((allergen) => glutenAllergens.includes(allergen));
-}
-
-// Helper function for API calls
-async function fetchAPI(url, options = {}) {
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "GlutenCheck - Android - Version 1.0 - www.glutencheck.com",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
-  } catch (error) {
-    console.error("Fetch error:", error);
-    throw error;
+    container.appendChild(div);
   }
 }
 
-// Helper function to check if product is in English
-function isEnglishProduct(product) {
-  // Check if product name exists and is in English
-  if (!product.product_name) return false;
-
-  // Check for specific English indicators
-  const hasEnglishName = product.product_name_en || product.product_name.match(/^[a-zA-Z0-9\s\W]+$/);
-
-  // If product has languages_tags, check if English is included
-  if (product.languages_tags) {
-    return product.languages_tags.includes("en");
-  }
-
-  return hasEnglishName;
-}
-
-// Search by barcode
-async function searchByBarcode() {
-  const searchValue = document.getElementById("searchInput").value;
-  if (!searchValue) {
-    alert("Please enter a barcode number");
-    return;
-  }
-
-  // Clear previous results
-  document.getElementById("searchResults").innerHTML = "";
-  const oldProductInfo = document.getElementById("productInfo");
-  if (oldProductInfo) oldProductInfo.remove();
-
-  // Show loading state
-  setLoading(true);
-
-  try {
-    const data = await API.searchByBarcode(searchValue);
-
-    if (data.status === 1) {
-      addRecentSearch(searchValue, "barcode");
-      displayInModal(data.product);
-    } else {
-      showError("Product not found");
-    }
-  } catch (error) {
-    console.error("Error:", error);
-    showError("Failed to fetch product information");
-  } finally {
-    setLoading(false);
-  }
-}
-
-// Search by name
-async function searchByName() {
-  const searchValue = document.getElementById("searchInput").value;
-  if (!searchValue) {
-    alert("Please enter a product name");
-    return;
-  }
-
-  // Clear previous results
-  document.getElementById("searchResults").innerHTML = "";
-  const oldProductInfo = document.getElementById("productInfo");
-  if (oldProductInfo) oldProductInfo.remove();
-
-  // Show loading state
-  setLoading(true);
-
-  try {
-    const data = await API.searchByName(searchValue);
-
-    if (data.products && data.products.length > 0) {
-      addRecentSearch(searchValue, "name");
-      displaySearchResults(data.products);
-    } else {
-      showError("No products found");
-    }
-  } catch (error) {
-    console.error("Error:", error);
-    showError("Failed to fetch search results");
-  } finally {
-    setLoading(false);
-  }
-}
-
-// Add this function to manage favorites
+// Function to get favorites
 function getFavorites() {
-  const favorites = localStorage.getItem(FAVORITES_KEY);
-  return favorites ? JSON.parse(favorites) : [];
+  var favs = localStorage.getItem("favorites");
+  return favs ? JSON.parse(favs) : [];
 }
 
+// Function to toggle favorite
 function toggleFavorite(code) {
-  let favorites = getFavorites();
-  const index = favorites.indexOf(code);
+  var favorites = getFavorites();
+  var index = favorites.indexOf(code);
 
-  if (index === -1) {
+  if (index == -1) {
     favorites.push(code);
   } else {
     favorites.splice(index, 1);
   }
 
-  localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+  localStorage.setItem("favorites", JSON.stringify(favorites));
 
-  // If we're viewing favorites, refresh the display
-  const favButton = document.getElementById("favoritesButton");
+  var favButton = document.getElementById("favoritesButton");
   if (favButton.classList.contains("active")) {
     showFavorites();
   }
 
-  return index === -1;
+  return index == -1;
 }
 
-// Show favorites
-async function showFavorites() {
-  const favorites = getFavorites();
-  if (favorites.length === 0) {
+// Function to check if product is favorite
+function isFavorite(code) {
+  var favorites = getFavorites();
+  return favorites.indexOf(code) != -1;
+}
+
+// Function to check if product has gluten
+function hasGluten(product) {
+  if (!product.labels_tags || !product.allergens_tags) {
+    return null; // unknown
+  }
+
+  // Check if labeled gluten-free
+  for (var i = 0; i < product.labels_tags.length; i++) {
+    if (product.labels_tags[i] == "en:gluten-free") {
+      return false;
+    }
+  }
+
+  // Check allergens
+  var glutenThings = ["en:gluten", "en:wheat", "en:barley", "en:rye", "en:oats"];
+  for (var i = 0; i < product.allergens_tags.length; i++) {
+    for (var j = 0; j < glutenThings.length; j++) {
+      if (product.allergens_tags[i] == glutenThings[j]) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// Function to show product in modal
+function showProductInModal(product) {
+  document.getElementById("modalProductName").innerText = product.product_name || "Unknown Product";
+  document.getElementById("modalBrand").innerText = product.brands || "Not specified";
+  document.getElementById("modalCategory").innerText = product.categories || "Not specified";
+
+  // Show barcode with copy button
+  var barcodeDiv = document.getElementById("modalBarcode");
+  barcodeDiv.innerHTML = "";
+  var barcode = product.code || "No barcode";
+
+  var span = document.createElement("span");
+  span.innerText = barcode;
+  barcodeDiv.appendChild(span);
+
+  if (barcode != "No barcode") {
+    barcodeDiv.appendChild(makeCopyButton(barcode));
+  }
+
+  // Show gluten status
+  var statusDiv = document.getElementById("modalGlutenStatus");
+  var hasGlutenStatus = hasGluten(product);
+
+  if (hasGlutenStatus === false) {
+    statusDiv.innerHTML = '<span style="color: green">✓ Gluten Free</span>';
+  } else if (hasGlutenStatus === null) {
+    statusDiv.innerHTML = '<span style="color: orange">? Unknown</span>';
+  } else {
+    statusDiv.innerHTML = '<span style="color: red">⚠ Has Gluten</span>';
+  }
+
+  // Show allergens
+  var allergens = [];
+  if (product.allergens_tags) {
+    for (var i = 0; i < product.allergens_tags.length; i++) {
+      var allergen = product.allergens_tags[i].replace("en:", "").replace(/-/g, " ");
+      allergen = allergen.charAt(0).toUpperCase() + allergen.slice(1);
+      allergens.push(allergen);
+    }
+  }
+  document.getElementById("modalAllergens").innerText = allergens.length > 0 ? allergens.join(", ") : "None listed";
+
+  // Show image
+  var imgContainer = document.getElementById("modalProductImage").parentElement;
+  var imgUrl = product.image_url;
+  if (!imgUrl && product.selected_images && product.selected_images.front && product.selected_images.front.display) {
+    imgUrl = product.selected_images.front.display.url;
+  }
+
+  if (imgUrl) {
+    imgContainer.innerHTML = '<img id="modalProductImage" src="' + imgUrl + '" alt="' + (product.product_name || "Product") + '">';
+  } else {
+    imgContainer.innerHTML = '<div class="no-image-placeholder">No image</div>';
+  }
+
+  showModal();
+}
+
+// Function to show search results
+function showSearchResults(products) {
+  var container = document.getElementById("searchResults");
+  container.innerHTML = "";
+
+  for (var i = 0; i < products.length; i++) {
+    var product = products[i];
+    var div = document.createElement("div");
+    div.className = "result-item";
+
+    var hasGlutenStatus = hasGluten(product);
+    if (hasGlutenStatus === false) {
+      div.className += " gluten-free";
+    } else if (hasGlutenStatus === null) {
+      div.className += " gluten-unknown";
+    }
+
+    var name = product.product_name || "Unknown Product";
+    var imgUrl = product.image_url;
+    if (!imgUrl && product.selected_images && product.selected_images.front && product.selected_images.front.display) {
+      imgUrl = product.selected_images.front.display.url;
+    }
+    var barcode = product.code || "No barcode";
+    var isFav = isFavorite(barcode);
+
+    var imgHtml = imgUrl ? '<img src="' + imgUrl + '" alt="' + name + '">' : '<div class="no-image-placeholder">No image</div>';
+
+    div.innerHTML = imgHtml + '<button class="fav-button ' + (isFav ? "active" : "") + "\" onclick=\"event.stopPropagation(); this.classList.toggle('active'); toggleFavorite('" + barcode + "');\">" + "♥" + "</button>" + '<div class="product-info">' + '<span class="product-name">' + name + "</span>" + '<span class="barcode">' + barcode + (barcode != "No barcode" ? '<button class="copy-button" onclick="event.stopPropagation(); copyBarcode(\'' + barcode + "', this)\">📋</button>" : "") + "</span>" + "</div>";
+
+    div.onclick = (function (product) {
+      return function () {
+        showProductInModal(product);
+      };
+    })(product);
+
+    container.appendChild(div);
+  }
+}
+
+// Function to search by barcode
+function searchByBarcode() {
+  var barcode = document.getElementById("searchInput").value;
+  if (!barcode) {
+    alert("Please enter a barcode number");
+    return;
+  }
+
+  document.getElementById("searchResults").innerHTML = "";
+  var oldInfo = document.getElementById("productInfo");
+  if (oldInfo) oldInfo.remove();
+
+  showLoading(true);
+
+  fetch("https://world.openfoodfacts.org/api/v0/product/" + barcode + ".json")
+    .then(function (response) {
+      return response.json();
+    })
+    .then(function (data) {
+      if (data.status == 1) {
+        addRecentSearch(barcode, "barcode");
+        showProductInModal(data.product);
+      } else {
+        showError("Product not found");
+      }
+    })
+    .catch(function (error) {
+      console.log("Error:", error);
+      showError("Could not get product information");
+    })
+    .finally(function () {
+      showLoading(false);
+    });
+}
+
+// Function to search by name
+function searchByName() {
+  var name = document.getElementById("searchInput").value;
+  if (!name) {
+    alert("Please enter a product name");
+    return;
+  }
+
+  document.getElementById("searchResults").innerHTML = "";
+  var oldInfo = document.getElementById("productInfo");
+  if (oldInfo) oldInfo.remove();
+
+  showLoading(true);
+
+  var url = "https://world.openfoodfacts.org/cgi/search.pl?" + "search_terms=" + name + "&search_simple=1" + "&action=process" + "&json=1" + "&page_size=24";
+
+  fetch(url)
+    .then(function (response) {
+      return response.json();
+    })
+    .then(function (data) {
+      if (data.products && data.products.length > 0) {
+        addRecentSearch(name, "name");
+        showSearchResults(data.products);
+      } else {
+        showError("No products found");
+      }
+    })
+    .catch(function (error) {
+      console.log("Error:", error);
+      showError("Could not get search results");
+    })
+    .finally(function () {
+      showLoading(false);
+    });
+}
+
+// Function to show favorites
+function showFavorites() {
+  var favorites = getFavorites();
+  if (favorites.length == 0) {
     showError("No favorite products yet! Click the ♥ on products to add them to favorites.");
     return;
   }
 
-  // Clear previous results
   document.getElementById("searchResults").innerHTML = "";
-  const oldProductInfo = document.getElementById("productInfo");
-  if (oldProductInfo) oldProductInfo.remove();
+  var oldInfo = document.getElementById("productInfo");
+  if (oldInfo) oldInfo.remove();
 
-  // Show loading state
-  setLoading(true);
+  showLoading(true);
 
-  try {
-    const products = [];
-    // Fetch details for each favorite product
-    for (const code of favorites) {
-      try {
-        const data = await API.getById(code);
-        if (data.status === 1) {
+  var products = [];
+  var loaded = 0;
+
+  for (var i = 0; i < favorites.length; i++) {
+    fetch("https://world.openfoodfacts.org/api/v0/product/" + favorites[i] + ".json")
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (data) {
+        if (data.status == 1) {
           products.push(data.product);
         }
-      } catch (error) {
-        console.error(`Error fetching product ${code}:`, error);
-      }
-    }
+        loaded++;
 
-    if (products.length > 0) {
-      displaySearchResults(products);
-    } else {
-      showError("Failed to load favorite products. Please try again later.");
-    }
-  } catch (error) {
-    console.error("Error:", error);
-    showError("Failed to load favorite products");
-  } finally {
-    setLoading(false);
+        if (loaded == favorites.length) {
+          if (products.length > 0) {
+            showSearchResults(products);
+          } else {
+            showError("Could not load favorite products");
+          }
+          showLoading(false);
+        }
+      })
+      .catch(function (error) {
+        console.log("Error:", error);
+        loaded++;
+
+        if (loaded == favorites.length) {
+          if (products.length > 0) {
+            showSearchResults(products);
+          } else {
+            showError("Could not load favorite products");
+          }
+          showLoading(false);
+        }
+      });
   }
 }
 
-// Helper function to check if a product is in favorites
-function isInFavorites(code) {
-  const favorites = getFavorites();
-  return favorites.includes(code);
-}
-
-// Display search results
-function displaySearchResults(products) {
-  const resultsContainer = document.getElementById("searchResults");
-  resultsContainer.innerHTML = "";
-
-  products.forEach((product) => {
-    const resultItem = document.createElement("div");
-    resultItem.className = "result-item";
-
-    if (isGlutenFree(product)) {
-      resultItem.classList.add("gluten-free");
-    } else if (!product.allergens_tags && !product.labels_tags) {
-      resultItem.classList.add("gluten-unknown");
-    }
-
-    const productName = product.product_name || "Unnamed Product";
-    const imageUrl = product.image_url || product.selected_images?.front?.display?.url || "";
-    const barcode = product.code || "No barcode available";
-    const isFavorite = isInFavorites(barcode);
-
-    const imageHtml = imageUrl ? `<img src="${imageUrl}" alt="${productName}" onerror="this.parentElement.innerHTML='<div class=\'no-image-placeholder\'>No image available</div>'">` : `<div class="no-image-placeholder">No image available</div>`;
-
-    resultItem.innerHTML = `
-      ${imageHtml}
-      <button class="fav-button ${isFavorite ? "active" : ""}" onclick="event.stopPropagation(); this.classList.toggle('active'); toggleFavorite('${barcode}');">
-        ♥
-      </button>
-      <div class="product-info">
-        <span class="product-name">${productName}</span>
-        <span class="barcode">
-          ${barcode}
-          ${barcode !== "No barcode available" ? `<button class="copy-button" onclick="event.stopPropagation(); copyToClipboard('${barcode}', this)">📋</button>` : ""}
-        </span>
-      </div>
-    `;
-
-    resultItem.onclick = () => displayInModal(product);
-    resultsContainer.appendChild(resultItem);
-  });
-}
-
-// Initialize recent searches display
-document.addEventListener("DOMContentLoaded", displayRecentSearches);
+// Show recent searches when page loads
+window.onload = function () {
+  showRecentSearches();
+};

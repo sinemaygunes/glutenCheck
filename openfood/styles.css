@@ -302,6 +302,7 @@ h1 {
   background: #f9fafb;
   transition: border 0.2s;
 }
+
 .search-box input:focus {
   border: 1.5px solid #61dafb;
 }

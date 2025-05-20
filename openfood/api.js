@@ -1,91 +1,110 @@
-// API Service Object
-const API = {
-  // Configuration
-  baseUrl: "https://world.openfoodfacts.org",
-  rateLimit: 1000, // 1 second delay between requests
+// API functions for the website
+var API = {
+  // Base URL for the API
+  url: "https://world.openfoodfacts.org",
 
-  // API endpoints
-  endpoints: {
-    product: "/api/v0/product",
-    search: "/cgi/search.pl",
-  },
+  // Wait time between requests (1 second)
+  waitTime: 1000,
 
-  // Search parameters
-  params: {
-    defaultFields: ["code", "product_name", "brands", "categories", "allergens_tags", "labels_tags", "image_url", "selected_images"],
-    pageSize: 24,
-    language: "en",
-  },
-
-  // Helper function for delay
-  delay: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-
-  // Helper function to build URL with parameters
-  buildUrl(endpoint, params = {}) {
-    const url = new URL(this.baseUrl + endpoint);
-    Object.entries(params).forEach(([key, value]) => {
-      if (Array.isArray(value)) {
-        url.searchParams.set(key, value.join(","));
-      } else if (value !== undefined && value !== null) {
-        url.searchParams.set(key, value.toString());
-      }
+  // Function to wait
+  wait: function (ms) {
+    return new Promise(function (resolve) {
+      setTimeout(resolve, ms);
     });
-    return url.toString();
   },
 
-  // Helper function for API calls
-  async fetchAPI(url, options = {}) {
-    try {
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          Accept: "application/json",
-          "User-Agent": "GlutenCheck - Android - Version 1.0 - www.glutencheck.com",
-        },
-      });
+  // Function to make URL
+  makeUrl: function (path, params) {
+    var url = this.url + path;
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+    // Add parameters if they exist
+    if (params) {
+      url += "?";
+      for (var key in params) {
+        if (params[key] != null) {
+          // Handle arrays
+          if (Array.isArray(params[key])) {
+            url += key + "=" + params[key].join(",") + "&";
+          } else {
+            url += key + "=" + params[key] + "&";
+          }
+        }
       }
-
-      return response.json();
-    } catch (error) {
-      console.error("Fetch error:", error);
-      throw error;
+      // Remove last &
+      url = url.slice(0, -1);
     }
+
+    return url;
   },
 
-  // API Functions
-  async searchByBarcode(barcode) {
-    const url = this.buildUrl(`${this.endpoints.product}/${barcode}.json`, {
-      lc: this.params.language,
+  // Function to call API
+  callApi: function (url) {
+    return fetch(url, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "GlutenCheck - Android - Version 1.0 - www.glutencheck.com",
+      },
+    })
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error("HTTP error " + response.status);
+        }
+        return response.json();
+      })
+      .catch(function (error) {
+        console.log("API error:", error);
+        throw error;
+      });
+  },
+
+  // Function to search by barcode
+  searchByBarcode: function (barcode) {
+    var url = this.makeUrl("/api/v0/product/" + barcode + ".json", {
+      lc: "en",
     });
-    const data = await this.fetchAPI(url);
-    await this.delay(this.rateLimit);
-    return data;
+
+    return this.callApi(url).then(
+      function (data) {
+        return this.wait(this.waitTime).then(function () {
+          return data;
+        });
+      }.bind(this)
+    );
   },
 
-  async searchByName(name) {
-    const url = this.buildUrl(this.endpoints.search, {
+  // Function to search by name
+  searchByName: function (name) {
+    var url = this.makeUrl("/cgi/search.pl", {
       search_terms: name,
       search_simple: 1,
       action: "process",
       json: 1,
-      page_size: this.params.pageSize,
-      lc: this.params.language,
-      fields: this.params.defaultFields,
+      page_size: 24,
+      lc: "en",
+      fields: ["code", "product_name", "brands", "categories", "allergens_tags", "labels_tags", "image_url", "selected_images"],
     });
-    const data = await this.fetchAPI(url);
-    await this.delay(this.rateLimit);
-    return data;
+
+    return this.callApi(url).then(
+      function (data) {
+        return this.wait(this.waitTime).then(function () {
+          return data;
+        });
+      }.bind(this)
+    );
   },
 
-  async getById(code) {
-    const url = this.buildUrl(`${this.endpoints.product}/${code}.json`, {
-      lc: this.params.language,
+  // Function to get product by ID
+  getById: function (code) {
+    var url = this.makeUrl("/api/v0/product/" + code + ".json", {
+      lc: "en",
     });
-    const data = await this.fetchAPI(url);
-    await this.delay(500); // Shorter delay for individual product fetches
-    return data;
+
+    return this.callApi(url).then(
+      function (data) {
+        return this.wait(500).then(function () {
+          return data;
+        });
+      }.bind(this)
+    );
   },
 };
