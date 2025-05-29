@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gluten Toleransı Belirtileri</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        body::before {
+            content: "";
+            background: url('gluten.jpg') no-repeat center center fixed;
+            background-size: cover;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+
+        }
+
+
+        .info-container {
+            max-width: 500px;
+            max-height: 500px;
+            background-color: rgb(149 178 184);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 {
+            color: #61dafb;
+            margin-bottom: 20px;
+        }
+
+        p {
+            font-size: 18px;
+            line-height: 1.6;
+            color: #ddd;
+        }
+
+        ul {
+            text-align: left;
+            font-size: 17px;
+            color: #ccc;
+            margin-top: 20px;
+            padding-left: 20px;
+        }
+
+        a.back-button {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background-color: #61dafb;
+            color: #000;
+            padding: 10px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        a.back-button:hover {
+            background-color: #21a1f1;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="info-container">
+        <h1>Gluten Toleransı Belirtileri</h1>
+        <p>
+            Gluten intoleransı veya hassasiyeti olan kişilerde şu belirtiler sıkça görülür:
+        </p>
+        <ul>
+            <li>Şişkinlik, gaz, karın ağrısı</li>
+            <li>İshal ya da kabızlık gibi sindirim sorunları</li>
+            <li>Baş ağrısı ve migren</li>
+            <li>Kronik yorgunluk</li>
+            <li>Eklem ve kas ağrıları</li>
+            <li>Ciltte döküntüler (örneğin, egzama)</li>
+            <li>Depresyon ve anksiyete</li>
+            <li>Demir eksikliği ve anemi</li>
+        </ul>
+        <p>
+            Bu belirtiler gluten içeren gıdaların tüketilmesiyle ortaya çıkıyorsa bir uzmana başvurmanız önerilir.
+        </p>
+        <a class="back-button" href="dashboard.html">← Geri Dön</a>
+    </div>
+</body>
+
+</html>
